@@ -5,16 +5,14 @@ All agents must inherit from BaseAgent.
 """
 
 from .base import BaseAgent
-from .soil import SoilIntelligenceAgent, AgronomyStrategyAgent
+from .soil import SoilIntelligenceAgent, MasterAgronomyAgent   # fixed: was AgronomyStrategyAgent
 from .weather import MicroClimateAgent
 from .vision import CropPathologyAgent
 
-# The __all__ list tells Python exactly what is allowed to be exported 
-# when someone runs `from agents import *`
 __all__ = [
     "BaseAgent",
     "SoilIntelligenceAgent",
-    "AgronomyStrategyAgent",
+    "MasterAgronomyAgent",      # canonical name from soil.py
     "MicroClimateAgent",
-    "CropPathologyAgent"
+    "CropPathologyAgent",
 ]
