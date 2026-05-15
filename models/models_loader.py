@@ -103,3 +103,28 @@ def load_agronomy_strategy_models():
         "fert_encoder": fert_le,
         "fert_columns": fert_cols
     }
+
+
+# ============================================================
+# TEAM DELTA: CROP PATHOLOGY VISION MODELS
+# ============================================================
+def load_pathology_vision_models():
+    """Loads DenseNet121 for Team Delta's Vision Node."""
+    print(f"[Models] Loading Crop Pathology Vision Models onto {DEVICE}...")
+    
+    densenet_model = None
+    
+    # Initialize DenseNet121 (4 output classes for the diseases)
+    try:
+        densenet_model = vision_models.densenet121(weights=None)
+        num_ftrs = densenet_model.classifier.in_features
+        densenet_model.classifier = nn.Linear(num_ftrs, 4)
+        densenet_model.load_state_dict(torch.load(os.path.join(MODELS_DIR, "densenet_pathology.pth"), map_location=DEVICE))
+        densenet_model.eval()
+        print("  ✓ Loaded densenet_pathology.pth")
+    except FileNotFoundError:
+        print("  [Warning] densenet_pathology.pth not found. Vision scans will use fallback.")
+
+    return {
+        "densenet": densenet_model
+    }
