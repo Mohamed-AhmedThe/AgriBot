@@ -1,0 +1,16 @@
+python -c "
+import importlib.util
+deps = {'torch': 'torch', 'torchvision': 'torchvision', 'xgboost': 'xgboost', 'sklearn': 'scikit-learn', 'chromadb': 'chromadb', 'pandas': 'pandas', 'streamlit': 'streamlit', 'groq': 'groq'}
+missing = []
+print('\n🔍 SCANNING ENVIRONMENT...')
+for mod, pip_name in deps.items():
+    if importlib.util.find_spec(mod):
+        print(f'  ✅ {mod}')
+    else:
+        print(f'  ❌ {mod}')
+        missing.append(pip_name)
+if missing:
+    print(f'\n⚙️  To fix, run exactly this command:\n    pip install {\" \".join(missing)}')
+else:
+    print('\n🎉 ALL CLEAR! You are ready to run: python test_stress.py')
+"

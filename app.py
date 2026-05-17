@@ -34,6 +34,7 @@ def load_all():
         load_soil_vision_model,
         load_agronomy_strategy_models,
         load_weather_models,
+        load_pathology_vision_models,
     )
     from agents.soil    import SoilIntelligenceAgent, MasterAgronomyAgent
     from agents.weather import MicroClimateAgent
@@ -46,6 +47,7 @@ def load_all():
     vision_model      = load_soil_vision_model()
     agronomy_weights  = load_agronomy_strategy_models()
     weather_weights   = load_weather_models()
+    pathology_weights = load_pathology_vision_models()
 
     # ── Instantiate agents ──────────────────────────────────
     soil_agent     = SoilIntelligenceAgent(soil_weights)
@@ -60,9 +62,9 @@ def load_all():
         device=DEVICE,
     )
 
-    # Vision agent — loaded by Team Delta; graceful stub if not yet merged
+    # Vision agent — Team Delta's tomato pathology model
     try:
-        vision_agent = CropPathologyAgent()
+        vision_agent = CropPathologyAgent(pathology_weights)
     except Exception:
         vision_agent = None
 
@@ -103,9 +105,9 @@ with st.sidebar:
     st.caption("Agentic AI Decision Support System")
     st.divider()
 
-    st.subheader("📷 Leaf Disease Scanner")
+    st.subheader("📷 Tomato Vision Scanner")
     uploaded_img = st.file_uploader(
-        "Upload a rice leaf photo",
+        "Upload a tomato photo",
         type=["jpg", "jpeg", "png"],
         key="leaf_upload",
     )
@@ -121,16 +123,16 @@ with st.sidebar:
             img.save(tmp.name)
             tmp_path = tmp.name
 
-        if st.button("🔍 Scan for Disease"):
+        if st.button("🔍 Scan Tomato"):
             with st.spinner("Running vision model…"):
                 result = brain.chat(
-                    f"Analyze this crop image for disease. image_path={tmp_path}",
+                    f"Analyze this tomato image. image_path={tmp_path}",
                     history=None,
                     verbose=False,
                 )
             os.unlink(tmp_path)
             st.session_state.queued_message = (
-                f"I scanned a rice leaf photo. The result: {result['reply']} "
+                f"I scanned a tomato photo. The result: {result['reply']} "
                 "What should I do next?"
             )
             st.rerun()

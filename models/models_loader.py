@@ -51,13 +51,18 @@ def load_soil_models():
 
     try:
         gru_model.load_state_dict(torch.load(
-            os.path.join(MODELS_DIR, "soil_gru.pth"), map_location=DEVICE))
+            os.path.join(MODELS_DIR, "soil_gru.pth"),
+            map_location=DEVICE, weights_only=False))
         lstm_model.load_state_dict(torch.load(
-            os.path.join(MODELS_DIR, "soil_lstm.pth"), map_location=DEVICE))
+            os.path.join(MODELS_DIR, "soil_lstm.pth"),
+            map_location=DEVICE, weights_only=False))
         cnn_model.load_state_dict(torch.load(
-            os.path.join(MODELS_DIR, "soil_cnn.pth"), map_location=DEVICE))
+            os.path.join(MODELS_DIR, "soil_cnn.pth"),
+            map_location=DEVICE, weights_only=False))
     except FileNotFoundError:
         print("[Warning] Time-Series Soil weights missing. Using untrained initialization.")
+    except RuntimeError as e:
+        print(f"[Warning] Soil weights state_dict mismatch: {e}. Using untrained initialization.")
 
     gru_model.eval()
     lstm_model.eval()
@@ -69,16 +74,21 @@ def load_soil_models():
 # ============================================================
 # TEAM BETA: 2. STRATEGY & VISION PIPELINE (SEQUENTIAL)
 # ============================================================
-def load_soil_vision_model():
+def load_soil_vision_model(num_classes: int = 4):
     print(f"[Models] Loading ConvNeXt-Tiny onto {DEVICE}...")
     model = vision_models.convnext_tiny(weights=None)
-    model.classifier[2] = nn.Linear(model.classifier[2].in_features, 4)
+    model.classifier[2] = nn.Linear(model.classifier[2].in_features, num_classes)
 
     try:
         model.load_state_dict(torch.load(
-            os.path.join(MODELS_DIR, "convnext_soil.pth"), map_location=DEVICE))
+            os.path.join(MODELS_DIR, "convnext_soil.pth"),
+            map_location=DEVICE,
+            weights_only=False,
+        ))
     except FileNotFoundError:
         print("[Warning] convnext_soil.pth not found. Using untrained initialization.")
+    except RuntimeError as e:
+        print(f"[Warning] convnext_soil.pth state_dict mismatch: {e}. Using untrained initialization.")
 
     model.eval()
     return model
@@ -108,27 +118,36 @@ def load_agronomy_strategy_models():
 
 
 # ============================================================
-# TEAM DELTA: CROP PATHOLOGY VISION MODELS
-# ============================================================
-# ============================================================
-# TEAM DELTA: CROP PATHOLOGY VISION MODELS
+# TEAM DELTA: CROP PATHOLOGY VISION MODELS (UPDATED FOR TOMATOES)
 # ============================================================
 def load_pathology_vision_models():
     """Loads DenseNet121 for Team Delta's Vision Node."""
-    print(f"[Models] Loading Crop Pathology Vision Models onto {DEVICE}...")
-    
+    print(f"[Models] Loading Vision Models onto {DEVICE}...")
+
     densenet_model = None
-    
-    # Initialize DenseNet121 (4 output classes for the diseases)
+
+    # Initialize DenseNet121 (3 output classes: Reject=0, Ripe=1, Unripe=2)
     try:
         densenet_model = vision_models.densenet121(weights=None)
         num_ftrs = densenet_model.classifier.in_features
-        densenet_model.classifier = nn.Linear(num_ftrs, 4)
-        densenet_model.load_state_dict(torch.load(os.path.join(MODELS_DIR, "densenet_pathology.pth"), map_location=DEVICE))
+
+        # 3 classes: Reject, Ripe, Unripe — DO NOT change back to 4
+        densenet_model.classifier = nn.Linear(num_ftrs, 3)
+
+        # Load the tomato weights
+        weight_path = os.path.join(MODELS_DIR, "best_DenseNet121_tomato.pth")
+        densenet_model.load_state_dict(
+            torch.load(weight_path, map_location=DEVICE, weights_only=False)
+        )
+        densenet_model = densenet_model.to(DEVICE)
         densenet_model.eval()
-        print("  ✓ Loaded densenet_pathology.pth")
+        print("  ✓ Loaded best_DenseNet121_tomato.pth")
     except FileNotFoundError:
-        print("  [Warning] densenet_pathology.pth not found. Vision scans will use fallback.")
+        print("  [Warning] best_DenseNet121_tomato.pth not found. Vision scans will use fallback.")
+        densenet_model = None
+    except RuntimeError as e:
+        print(f"  [Warning] DenseNet121 state_dict mismatch: {e}. Vision scans will use fallback.")
+        densenet_model = None
 
     return {
         "densenet": densenet_model
@@ -226,7 +245,7 @@ def load_weather_models() -> dict:
     --------------
     weather_gru.pth      — WeatherGRURegressor state dict
     weather_lstm.pth     — WeatherLSTMRegressor state dict
-    weather_cnn.pth      — Weather1DCNNClassifier state dict
+    weather_cnn.pth      — Weather1DCNNRegressor state dict
     weather_scaler.pkl   — sklearn MinMaxScaler fitted on Temperature + Humidity
 
     Returns
@@ -251,8 +270,13 @@ def load_weather_models() -> dict:
     for key, (filename, model) in weight_files.items():
         path = os.path.join(MODELS_DIR, filename)
         if os.path.exists(path):
-            model.load_state_dict(torch.load(path, map_location=DEVICE))
-            print(f"  ✓ Loaded {filename}")
+            try:
+                model.load_state_dict(
+                    torch.load(path, map_location=DEVICE, weights_only=False)
+                )
+                print(f"  ✓ Loaded {filename}")
+            except RuntimeError as e:
+                print(f"  [Warning] {filename} state_dict mismatch: {e}. Using untrained {key.upper()}.")
         else:
             print(f"  [Warning] {filename} not found — using untrained {key.upper()}.")
 

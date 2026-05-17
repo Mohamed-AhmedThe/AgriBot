@@ -41,10 +41,10 @@ class SoilIntelligenceAgent(BaseAgent):
                 1 if lstm_prob > 0.5 else 0,
                 1 if cnn_prob > 0.5 else 0
             ]
-            
+
             is_healthy = sum(votes) >= 2
             probs = [gru_prob, lstm_prob, cnn_prob]
-            winning_probs = [p for v, p in zip(votes, probs) if v == is_healthy]
+            winning_probs = [prob for v, prob in zip(votes, probs) if v == (1 if is_healthy else 0)]
             avg_confidence = sum(winning_probs) / len(winning_probs) if winning_probs else 0.0
 
             status = "Nominal" if is_healthy else "Warning"
@@ -132,6 +132,8 @@ class MasterAgronomyAgent(BaseAgent):
                 recommended_fertilizer = self.fert_le.inverse_transform([fert_encoded])[0]
 
             # --- FINAL OUTPUT FORMATTING ---
+            ran_real_inference = bool(self.rf_crop and self.crop_le and self.xgb_fert)
+            confidence = 0.92 if ran_real_inference else 0.60
             finding_str = (
                 f"Camera classified soil as {predicted_soil_type}. "
                 f"Environmental parameters suggest planting {predicted_crop}. "
@@ -142,12 +144,13 @@ class MasterAgronomyAgent(BaseAgent):
                 "unit": "MasterAgronomyPipeline",
                 "status": "Action Required",
                 "finding": finding_str,
-                "confidence_score": 0.92,
+                "confidence_score": confidence,
                 "recommended_action": "deploy_fertilizer",
                 "action_parameters": {
                     "soil_type": predicted_soil_type,
                     "target_crop": predicted_crop,
-                    "fertilizer": recommended_fertilizer
+                    "fertilizer": recommended_fertilizer,
+                    "recommended_action": "deploy_fertilizer",
                 }
             }
 

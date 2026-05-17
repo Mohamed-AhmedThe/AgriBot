@@ -99,9 +99,9 @@ TOOLS: List[Dict[str, Any]] = [
         "function": {
             "name": "analyze_crop_image",
             "description": (
-                "Run the CropPathologyAgent (MobileViT) on a rice leaf image "
-                "to classify disease. Triggers if a visual anomaly is detected "
-                "after soil/weather analysis."
+                "Run the CropPathologyAgent (DenseNet121) on a tomato image "
+                "to classify its state as Reject, Ripe, or Unripe. "
+                "Triggers when a visual crop assessment is required."
             ),
             "parameters": {
                 "type": "object",
@@ -181,16 +181,16 @@ def _build_system_prompt() -> str:
 Route user queries to the correct specialist agents, aggregate their JSON reports, and issue clear, actionable recommendations to the farmer.
 
 ## Available Agents
-- **SoilIntelligenceAgent** (analyze_soil): Binary health classification on NPK + moisture.
+- **SoilIntelligenceAgent** (analyze_soil): Binary health classification on NPK + moisture time-series.
 - **MicroClimateAgent** (analyze_weather): Anomaly detection + next-step temperature/humidity forecast.
-- **CropPathologyAgent** (analyze_crop_image): Rice leaf disease classification (10 classes).
-- **MasterAgronomyAgent** (run_agronomy_pipeline): Full soil-type → crop → fertilizer chain.
+- **CropPathologyAgent** (analyze_crop_image): Tomato ripeness/quality classification via DenseNet121. Returns one of three classes: Reject (0), Ripe (1), Unripe (2).
+- **MasterAgronomyAgent** (run_agronomy_pipeline): Full soil-type → crop recommendation → fertilizer chain via XGBoost and Random Forest.
 - **MemoryNode** (recall_memory): Semantic retrieval of past events from ChromaDB.
 
 ## Routing Rules
 1. Soil NPK / moisture query → call `analyze_soil`.
 2. Temperature / humidity / weather query → call `analyze_weather`.
-3. Leaf image uploaded → call `analyze_crop_image`, then `run_agronomy_pipeline` if disease found.
+3. Tomato image uploaded → call `analyze_crop_image`.
 4. Fertilizer / crop recommendation → call `run_agronomy_pipeline`.
 5. "What happened before / history / past" → call `recall_memory`.
 6. Multiple concerns → call multiple tools sequentially.
@@ -460,9 +460,14 @@ class SupervisorBrain:
         """
         Combines LLM-extracted args + agent action_parameters into the
         flat dict expected by enforce_safety().
+
+        action_type is read from fn_args["recommended_action"] (the agent's
+        machine-readable action token, e.g. "deploy_fertilizer") with a safe
+        fallback to "deploy_fertilizer" if absent.  The old code incorrectly
+        read action_params.get("fertilizer"), which is the fertilizer *name*.
         """
         return {
-            "action_type":           action_params.get("fertilizer", "deploy_fertilizer"),
+            "action_type":           action_params.get("recommended_action", "deploy_fertilizer"),
             "nitrogen_kg_ha":        fn_args.get("nitrogen"),
             "phosphorus_kg_ha":      fn_args.get("phosphorus"),
             "potassium_kg_ha":       fn_args.get("potassium"),

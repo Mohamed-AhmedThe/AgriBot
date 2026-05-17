@@ -51,7 +51,7 @@ class MemoryNode:
             return doc_id
         except Exception as e:
             print(f"[MemoryNode Error] Failed to store event: {str(e)}")
-            return ""
+            return None
 
     def recall(self, query: str, k: int = 3) -> List[str]:
         """
@@ -63,20 +63,27 @@ class MemoryNode:
                 query_texts=[query],
                 n_results=k
             )
-            
+
             memories: List[str] = []
-            
+
             # ChromaDB returns nested lists for batched queries
             if results.get('documents') and len(results['documents']) > 0:
                 docs = results['documents'][0]
                 metas = results['metadatas'][0]
-                
+
                 for doc, meta in zip(docs, metas):
                     time = meta.get("timestamp", "Unknown Time")
                     memories.append(f"[{time}]: {doc}")
-                    
+
             return memories
-            
+
         except Exception as e:
             print(f"[MemoryNode Error] Recall query failed: {str(e)}")
             return []
+
+    def query(self, query_text: str, n_results: int = 3) -> List[str]:
+        """
+        Alias for recall() matching the Supervisor's call signature:
+            self.memory.query(fn_args["query"], n_results=fn_args.get("n_results", 3))
+        """
+        return self.recall(query_text, k=n_results)

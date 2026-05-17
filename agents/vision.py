@@ -27,7 +27,7 @@ class CropPathologyAgent(BaseAgent):
         ])
         
         # Disease taxonomy
-        self.classes = {0: "Healthy", 1: "Leaf Blight", 2: "Rust", 3: "Powdery Mildew"}
+        self.classes = {0: "Reject", 1: "Ripe", 2: "Unripe"}
 
     def evaluate(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -40,7 +40,13 @@ class CropPathologyAgent(BaseAgent):
             
             # --- FAULT TOLERANCE 1: Missing File ---
             if not img_path or not os.path.exists(img_path):
-                return self._mock_inference(scan_type, error=f"Image file not found at {img_path}")
+                return {
+                    "unit": "CropPathologyAgent",
+                    "status": "Error",
+                    "finding": f"Hardware Failure: Image file not found at {img_path}",
+                    "confidence_score": 0.0,
+                    "recommended_action": "check_camera_hardware"
+                }
 
             # --- FAULT TOLERANCE 2: Missing Weights ---
             if not self.densenet:
@@ -79,24 +85,27 @@ class CropPathologyAgent(BaseAgent):
         return self._build_response(disease_idx=1, conf_score=0.88, scan_type=scan_type)
 
     def _build_response(self, disease_idx: int, conf_score: float, scan_type: str) -> Dict[str, Any]:
-        """Constructs the strictly validated JSON payload."""
-        disease_name = self.classes.get(disease_idx, "Unknown Anomaly")
-        
-        if disease_name == "Healthy":
-            status, action = "Nominal", "none"
-        else:
-            status, action = "Warning", "quarantine_crop"
+            """Constructs the strictly validated JSON payload."""
+            vision_target = self.classes.get(disease_idx, "Unknown Anomaly")
             
-        finding_str = f"Vision scan ({scan_type}) completed. Detected: {disease_name}."
+            # 👇 NEW LOGIC FOR TOMATOES 👇
+            if vision_target == "Ripe":
+                status, action = "Nominal", "initiate_harvest"
+            elif vision_target == "Unripe":
+                status, action = "Nominal", "none"  # Just wait
+            else: # Reject
+                status, action = "Warning", "quarantine_crop"
+                
+            finding_str = f"Vision scan ({scan_type}) completed. Detected: Tomato is {vision_target}."
 
-        return {
-            "unit": "CropPathologyAgent",
-            "status": status,
-            "finding": finding_str,
-            "confidence_score": round(conf_score, 3),
-            "recommended_action": action,
-            "action_parameters": {
-                "disease_type": disease_name,
-                "scan_mode": scan_type
+            return {
+                "unit": "CropPathologyAgent",
+                "status": status,
+                "finding": finding_str,
+                "confidence_score": round(conf_score, 3),
+                "recommended_action": action,
+                "action_parameters": {
+                    "target_status": vision_target,
+                    "scan_mode": scan_type
+                }
             }
-        }
