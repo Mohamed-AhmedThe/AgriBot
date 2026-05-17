@@ -115,10 +115,11 @@ with st.sidebar:
     if uploaded_img:
         import tempfile, os
         img = Image.open(uploaded_img)
-        st.image(img, caption="Uploaded leaf", use_container_width=True)
+        st.image(img, caption="Uploaded tomato", use_container_width=True)
 
+        # Write to system temp dir — safe on cloud / read-only deployments
         with tempfile.NamedTemporaryFile(
-            delete=False, suffix=".jpg", dir="."
+            delete=False, suffix=".jpg", dir=tempfile.gettempdir()
         ) as tmp:
             img.save(tmp.name)
             tmp_path = tmp.name
@@ -130,7 +131,10 @@ with st.sidebar:
                     history=None,
                     verbose=False,
                 )
-            os.unlink(tmp_path)
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass  # best-effort cleanup
             st.session_state.queued_message = (
                 f"I scanned a tomato photo. The result: {result['reply']} "
                 "What should I do next?"
@@ -159,8 +163,13 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-prompt = st.session_state.pop("queued_message", None) or st.chat_input(
-    "Ask about soil health, weather forecast, or rice disease…"
+# st.session_state.pop() with a default is unreliable across Streamlit versions;
+# use explicit get + conditional delete instead.
+_queued = st.session_state.get("queued_message")
+if _queued:
+    del st.session_state["queued_message"]
+prompt = _queued or st.chat_input(
+    "Ask about soil health, weather forecast, or tomato ripeness…"
 )
 
 if prompt:
